@@ -205,6 +205,8 @@ def get_items(server_url, user_key, auth_key):
     deleteItems=[]
 
     for item in data['Items']:
+        if bool(cfg.DEBUG):
+            print(':*[DEBUG] - ' + item['Name'])
         if   (
              (item['Type'] == 'Movie') and
              (cfg.not_played_age_movie >= 0) and
