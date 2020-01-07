@@ -57,6 +57,7 @@ def generate_config():
     config_file += "access_token='"+ auth_key +"'\n"
     config_file += "user_key='"+ user_key +"'\n"
     config_file += "DEBUG=0\n"
+    config_file += "playstate=0\n"
     #config_file += "#----------------------------------------------------------#\n"
     #config_file += "#-1=Disable deleting for media type (movie, episode, video, trailer)#\n"
     #config_file += "# 0-365000=Delete media type once it has been watched x days ago#\n"
@@ -177,7 +178,7 @@ def get_days_since_watched(date_last_played):
     return(days_since_watched)
 
 
-def get_items(server_url, user_key, auth_key):
+def get_items_played(server_url, user_key, auth_key):
     #Get list of all played items
     print('-----------------------------------------------------------')
     print('Start...')
@@ -299,6 +300,119 @@ def get_items(server_url, user_key, auth_key):
     return(deleteItems)
 
 
+def get_items_not_played(server_url, user_key, auth_key):
+    #Get list of all played items
+    print('-----------------------------------------------------------')
+    print('Start...')
+    print('Cleaning media for server at: ' + server_url)
+    print('-----------------------------------------------------------')
+    print('\n')
+    print('-----------------------------------------------------------')
+    print('Get List Of Watched Media')
+    print('-----------------------------------------------------------')
+    url=server_url + '/emby/Users/' + user_key  + '/Items?Recursive=true&IsPlayed=false&api_key=' + auth_key
+    if bool(cfg.DEBUG):
+        print(url)
+    with request.urlopen(url) as response:
+        if response.getcode() == 200:
+            source = response.read()
+            data = json.loads(source)
+        else:
+            print('An error occurred while attempting to retrieve data from the API.')
+
+    deleteItems=[]
+
+    for item in data['Items']:
+        if bool(cfg.DEBUG):
+            print(':*[DEBUG] - ' + item['Name'])
+        if   (
+             (item['Type'] == 'Movie') and
+             (cfg.not_played_age_movie >= 0) and
+             (not bool(cfg.ignore_favorites_movie) or not item['UserData']['IsFavorite'])
+             ):
+            try:
+                item_details='  ' + item['Type'] + ' - ' + item['Name'] + ' - Favorite: ' + str(item['UserData']['IsFavorite'])  + ' - ' + 'MovieID: ' + item['Id']
+            except (KeyError):
+                print('Error encounter: \n\n' + str(item))
+                exit(1)
+            print(':*[DELETE] - ' + item_details)
+            deleteItems.append(item)
+        elif (
+             (item['Type'] == 'Episode') and
+             (cfg.not_played_age_episode >= 0) and
+             (not bool(cfg.ignore_favorites_episode) or not item['UserData']['IsFavorite'])
+             ):
+            try:
+                item_details=item['Type'] + ' - ' + item['SeriesName'] + ' - ' + item['Name'] + ' - Favorite: ' + str(item['UserData']['IsFavorite'])  + ' - ' + 'EpisodeID: ' + item['Id']
+            except (KeyError):
+                print('Error encounter: \n\n' + str(item))
+                exit(1)
+            print(':*[DELETE] - ' + item_details)
+            deleteItems.append(item)
+        elif (
+             (item['Type'] == 'Video') and
+             (cfg.not_played_age_video >= 0) and
+             (not bool(cfg.ignore_favorites_video) or not item['UserData']['IsFavorite'])
+             ):
+            try:
+                item_details=item['Type'] + ' - ' + item['Name'] + ' -  Favorite: ' + str(item['UserData']['IsFavorite'])  + ' - ' + 'VideoID: ' + item['Id']
+            except (KeyError):
+                print('Error encounter: \n\n' + str(item))
+                exit(1)
+            print(':*[DELETE] - ' + item_details)
+            deleteItems.append(item)
+        elif (
+             (item['Type'] == 'Trailer') and
+             (cfg.not_played_age_trailer >= 0) and
+             (not bool(cfg.ignore_favorites_trailer) or not item['UserData']['IsFavorite'])
+             ):
+            try:
+                item_details=item['Type'] + ' - ' + item['Name'] + ' -  Favorite: ' + str(item['UserData']['IsFavorite'])  + ' - ' + 'TrailerID: ' + item['Id']
+            except (KeyError):
+                print('Error encounter: \n\n' + str(item))
+                exit(1)
+            print(':*[DELETE] - ' + item_details)
+            deleteItems.append(item)
+        else:
+            if   (item['Type'] == 'Movie'):
+                try:
+                    item_details='  ' + item['Type'] + ' - ' + item['Name'] + ' - Favorite: ' + str(item['UserData']['IsFavorite'])  + ' - ' + 'MovieID: ' + item['Id']
+                except (KeyError):
+                    print('Error encounter: \n\n' + str(item))
+                    exit(1)
+                print(':[KEEPING] - ' + item_details)
+            elif (item['Type'] == 'Episode'):
+                try:
+                    item_details=item['Type'] + ' - ' + item['SeriesName'] + ' - ' + item['Name'] + ' - Favorite: ' + str(item['UserData']['IsFavorite'])  + ' - ' + 'EpisodeID: ' + item['Id']
+                except (KeyError):
+                    print('Error encounter: \n\n' + str(item))
+                    exit(1)
+                print(':[KEEPING] - ' + item_details)
+            elif (item['Type'] == 'Video'):
+                try:
+                    item_details=item['Type'] + ' - ' + item['Name'] + ' - Favorite: ' + str(item['UserData']['IsFavorite'])  + ' - ' + 'VideoID: ' + item['Id']
+                except (KeyError):
+                    print('Error encounter: \n\n' + str(item))
+                    exit(1)
+                print(':[KEEPING] - ' + item_details)
+            elif (item['Type'] == 'Trailer'):
+                try:
+                    item_details=item['Type'] + ' - ' + item['Name'] + ' - Favorite: ' + str(item['UserData']['IsFavorite'])  + ' - ' + 'TrailerID: ' + item['Id']
+                except (KeyError):
+                    print('Error encounter: \n\n' + str(item))
+                    exit(1)
+                print(':[KEEPING] - ' + item_details)
+            else: #(item['Type'] == 'Unknown'):
+                try:
+                    item_details=item['Type'] + ' - ' + item['Name'] + ' - Favorite: ' + str(item['UserData']['IsFavorite'])  + ' - ' + item['Type'] + 'ID: ' +  item['Id']
+                except (KeyError):
+                    print('Error encounter: \n\n' + str(item))
+                    exit(1)
+                print(':[KEEPING UNKNOWN MEDIA TYPE] - ' + item_details)
+    print('-----------------------------------------------------------')
+    return(deleteItems)
+
+
 def list_items(deleteItems):
     #List items to be deleted
     print ('\n')
@@ -345,6 +459,7 @@ try:
         not hasattr(cfg, 'access_token') or
         not hasattr(cfg, 'user_key') or
         not hasattr(cfg, 'ignore_favorites_movie') or
+        not hasattr(cfg, 'playstate') or
         not hasattr(cfg, 'ignore_favorites_episode') or
         not hasattr(cfg, 'ignore_favorites_video') or
         not hasattr(cfg, 'ignore_favorites_trailer') or
@@ -396,6 +511,10 @@ try:
             print('user_key=\'' + str(user_key) + '\'')
             setattr(cfg, 'user_key', user_key)
 
+        if not hasattr(cfg, 'playstate'):
+            print('playstate=1')
+            setattr(cfg, 'playstate', 0)
+
         if not hasattr(cfg, 'ignore_favorites_movie'):
             print('ignore_favorites_movie=1')
             setattr(cfg, 'ignore_favorites_movie', 1)
@@ -435,5 +554,9 @@ except (AttributeError, ModuleNotFoundError):
 
 #auth_key=get_auth_key(cfg.server_url, cfg.admin_username, cfg.admin_password_sha1)
 #deleteItems=get_items(cfg.server_url, cfg.user_key, auth_key)
-deleteItems=get_items(cfg.server_url, cfg.user_key, cfg.access_token)
+if not bool(cfg.remove_files):
+    deleteItems=get_items_not_played(cfg.server_url, cfg.user_key, cfg.access_token)
+else:
+    deleteItems=get_items_played(cfg.server_url, cfg.user_key, cfg.access_token)
+
 list_items(deleteItems)
